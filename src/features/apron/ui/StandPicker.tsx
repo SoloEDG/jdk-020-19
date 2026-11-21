@@ -11,10 +11,28 @@ export function StandPicker({
 }) {
   const f = state.flights.find((x) => x.id === state.selectedFlightId);
   if (!f || f.status !== "incoming") return null;
-  const valid = state.stands.find((s) => s.id === state.selectedStandId);
+  const valid = state.stands.find((s) => s.id === state.selectedStandId),
+    planned = f.plannedStandId
+      ? state.stands.find((s) => s.id === f.plannedStandId)
+      : undefined;
   return (
     <div className="stand-picker">
       <div className="hint-label">01 / 为航班分配机位</div>
+      {planned && (
+        <p className="planned-stand" data-testid="planned-stand">
+          接班计划建议机位 <b>{planned.id}</b>
+          <button
+            className="linkish"
+            disabled={
+              !!occupiedFlight(state, planned.id) ||
+              !compatibleStand(planned, f)
+            }
+            onClick={() => onSelect(planned.id)}
+          >
+            采用
+          </button>
+        </p>
+      )}
       <div className="stand-choices">
         {state.stands.map((s) => (
           <button
@@ -25,6 +43,7 @@ export function StandPicker({
           >
             {s.id}
             {s.size === "wide" && <small>W</small>}
+            {s.id === f.plannedStandId && <small className="plan-mark">计</small>}
           </button>
         ))}
       </div>

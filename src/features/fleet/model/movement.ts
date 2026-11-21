@@ -2,6 +2,7 @@ import type { Shift } from "../../../shared/types";
 import { copyShift } from "../../../shared/document";
 import { routePosition } from "../lib/routing";
 export function advanceFleet(state: Shift, seconds: number): Shift {
+  if (state.archived) return state;
   const s = copyShift(state);
   for (const v of s.vehicles) {
     if (v.status !== "travel" && v.status !== "returning") continue;

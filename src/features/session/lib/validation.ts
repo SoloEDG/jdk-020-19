@@ -9,6 +9,7 @@ const flightStates = [
 ];
 const serviceStates = ["pending", "travel", "working", "done"];
 const vehicleStates = ["idle", "travel", "working", "returning"];
+const tones = ["info", "success", "warning"];
 type Row = Record<string, unknown>;
 function row(value: unknown): value is Row {
   return typeof value === "object" && value !== null;
@@ -22,39 +23,152 @@ function text(value: unknown): value is string {
 function point(value: unknown): boolean {
   return row(value) && finite(value.x) && finite(value.y);
 }
-function unique(values: Row[]): boolean {
-  return (
-    values.every((x) => text(x.id)) &&
-    new Set(values.map((x) => x.id)).size === values.length
-  );
-}
-function collection(value: unknown, length: number): value is Row[] {
+function collection(value: unknown): value is Row[] {
   return (
     Array.isArray(value) &&
-    value.length === length &&
+    value.length > 0 &&
     value.every(row) &&
-    unique(value)
+    value.every((x) => text(x.id)) &&
+    new Set(value.map((x) => x.id)).size === value.length
+  );
+}
+function optionalId(value: unknown, ids: Set<unknown>): boolean {
+  return value === undefined || ids.has(value);
+}
+function validTaskLine(value: unknown): boolean {
+  return (
+    row(value) &&
+    text(value.taskId) &&
+    text(value.flightId) &&
+    kinds.includes(value.kind as string) &&
+    serviceStates.includes(value.status as string) &&
+    finite(value.progress) &&
+    value.progress >= 0 &&
+    value.progress <= 100 &&
+    finite(value.remainingSeconds) &&
+    value.remainingSeconds >= 0 &&
+    (value.vehicleId === undefined || text(value.vehicleId)) &&
+    (value.occupiedStandId === undefined || text(value.occupiedStandId))
+  );
+}
+function validSettlement(value: unknown): boolean {
+  if (!row(value)) return false;
+  const nonNegative = [
+    "delayPenalty",
+    "accruedDelaySeconds",
+    "carriedDelaySeconds",
+    "departedFlights",
+    "inheritedFlights",
+    "unfinishedTasks",
+    "activeVehicles",
+    "occupiedStands",
+  ];
+  return (
+    finite(value.earnedScore) &&
+    finite(value.finalScore) &&
+    nonNegative.every((key) => finite(value[key]) && (value[key] as number) >= 0)
+  );
+}
+function validOption(value: unknown): boolean {
+  return (
+    row(value) &&
+    (value.key === "now" || value.key === "planned") &&
+    text(value.label) &&
+    finite(value.at) &&
+    finite(value.settleableScore) &&
+    finite(value.newInboundCount) &&
+    finite(value.inheritedFlights) &&
+    finite(value.unfinishedTasks) &&
+    ["低", "中", "高"].includes(value.riskLevel as string) &&
+    typeof value.note === "string"
+  );
+}
+function validHandoverRecord(value: unknown): boolean {
+  if (!row(value)) return false;
+  if (
+    !text(value.id) ||
+    !text(value.fromShiftId) ||
+    !finite(value.fromShiftNumber) ||
+    !text(value.toShiftId) ||
+    !finite(value.toShiftNumber) ||
+    !finite(value.at) ||
+    value.confirmed !== true ||
+    !Array.isArray(value.taskLines) ||
+    !value.taskLines.every(validTaskLine) ||
+    !Array.isArray(value.inheritedFlightIds) ||
+    !Array.isArray(value.inheritedServiceIds) ||
+    !Array.isArray(value.inheritedVehicleIds) ||
+    !Array.isArray(value.occupiedStandIds) ||
+    !Array.isArray(value.planFlightIds) ||
+    !Array.isArray(value.plan) ||
+    !Array.isArray(value.newFlights) ||
+    !value.newFlights.every(row) ||
+    !Array.isArray(value.risks) ||
+    !validSettlement(value.settlement) ||
+    !row(value.comparison) ||
+    !validOption(value.comparison.now) ||
+    !validOption(value.comparison.planned) ||
+    !row(value.fromArchive)
+  )
+    return false;
+  const archive = value.fromArchive;
+  return (
+    text(archive.shiftId) &&
+    finite(archive.number) &&
+    finite(archive.time) &&
+    Array.isArray(archive.flights) &&
+    Array.isArray(archive.services) &&
+    Array.isArray(archive.vehicles) &&
+    Array.isArray(archive.stands) &&
+    Array.isArray(archive.events) &&
+    archive.flights.every(
+      (f) =>
+        row(f) &&
+        text(f.id) &&
+        flightStates.includes(f.status as string) &&
+        finite(f.arrival) &&
+        finite(f.deadline),
+    ) &&
+    archive.services.every(
+      (s) =>
+        row(s) &&
+        text(s.id) &&
+        text(s.flightId) &&
+        kinds.includes(s.kind as string) &&
+        serviceStates.includes(s.status as string),
+    )
   );
 }
 export function validShift(value: unknown): value is Shift {
   if (
     !row(value) ||
     value.version !== 1 ||
+    !text(value.shiftId) ||
+    !finite(value.number) ||
+    value.number < 1 ||
+    !finite(value.startedAt) ||
+    !finite(value.endsAt) ||
+    value.endsAt <= value.startedAt ||
     !finite(value.time) ||
     value.time < 0 ||
     !finite(value.score) ||
     !finite(value.conflicts) ||
     value.conflicts < 0 ||
     typeof value.paused !== "boolean" ||
+    typeof value.archived !== "boolean" ||
     ![1, 2, 4].includes(value.speed as number) ||
-    !finite(value.nextEventId)
+    !finite(value.nextEventId) ||
+    !Array.isArray(value.handoverLog) ||
+    value.handoverLog.length > 8 ||
+    !value.handoverLog.every(validHandoverRecord) ||
+    (value.handover !== undefined && !validHandoverRecord(value.handover))
   )
     return false;
   if (
-    !collection(value.flights, 6) ||
-    !collection(value.stands, 6) ||
-    !collection(value.vehicles, 6) ||
-    !collection(value.services, 18) ||
+    !collection(value.flights) ||
+    !collection(value.stands) ||
+    !collection(value.vehicles) ||
+    !collection(value.services) ||
     !Array.isArray(value.events) ||
     value.events.length > 30
   )
@@ -82,7 +196,24 @@ export function validShift(value: unknown): value is Shift {
         f.passengers > 0 &&
         text(f.color) &&
         (f.departureAt === undefined || finite(f.departureAt)) &&
-        (f.standId === undefined || standIds.has(f.standId)),
+        optionalId(f.standId, standIds) &&
+        optionalId(f.plannedStandId, standIds) &&
+        (f.delayCarried === undefined ||
+          (finite(f.delayCarried) && f.delayCarried >= 0)) &&
+        (f.delayLedger === undefined ||
+          (Array.isArray(f.delayLedger) &&
+            f.delayLedger.every(
+              (e) =>
+                row(e) &&
+                text(e.shiftId) &&
+                finite(e.shiftNumber) &&
+                finite(e.seconds) &&
+                e.seconds >= 0 &&
+                finite(e.at),
+            ))) &&
+        (f.departureShiftId === undefined || text(f.departureShiftId)) &&
+        (f.departureShiftNumber === undefined ||
+          finite(f.departureShiftNumber)),
     )
   )
     return false;
@@ -108,7 +239,7 @@ export function validShift(value: unknown): value is Shift {
         v.progress <= 100 &&
         finite(v.tripDuration) &&
         v.tripDuration > 0 &&
-        (v.serviceId === undefined || serviceIds.has(v.serviceId)),
+        optionalId(v.serviceId, serviceIds),
     )
   )
     return false;
@@ -123,7 +254,13 @@ export function validShift(value: unknown): value is Shift {
         s.progress <= 100 &&
         finite(s.duration) &&
         s.duration > 0 &&
-        (s.vehicleId === undefined || vehicleIds.has(s.vehicleId)),
+        optionalId(s.vehicleId, vehicleIds) &&
+        (s.handover === undefined ||
+          (row(s.handover) &&
+            text(s.handover.recordId) &&
+            text(s.handover.fromShiftId) &&
+            finite(s.handover.at) &&
+            serviceStates.includes(s.handover.status as string))),
     )
   )
     return false;
@@ -137,6 +274,7 @@ export function validShift(value: unknown): value is Shift {
     )
   )
     return false;
+  if (services.length !== flights.length * 3) return false;
   const occupied = flights
     .filter((f) => f.status !== "departed" && f.standId !== undefined)
     .map((f) => f.standId);
@@ -155,9 +293,12 @@ export function validShift(value: unknown): value is Shift {
     !services.every((s) => {
       if (s.status === "pending")
         return s.progress === 0 && s.vehicleId === undefined;
+      if (s.status === "done") {
+        const v = vehicles.find((x) => x.id === s.vehicleId);
+        return s.progress === 100 && (!v || v.kind === s.kind);
+      }
       const v = vehicles.find((x) => x.id === s.vehicleId);
       if (!v || v.kind !== s.kind) return false;
-      if (s.status === "done") return s.progress === 100;
       return (
         v.serviceId === s.id &&
         v.status === s.status &&
@@ -207,7 +348,7 @@ export function validShift(value: unknown): value is Shift {
         finite(e.id) &&
         finite(e.time) &&
         text(e.text) &&
-        ["info", "success", "warning"].includes(e.tone as string),
+        tones.includes(e.tone as string),
     )
   )
     return false;

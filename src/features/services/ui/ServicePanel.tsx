@@ -49,6 +49,16 @@ export function ServicePanel({
                   ? (reason ??
                     `${selected?.id ?? "暂无空闲车辆"} · ${Math.round(t.duration)}s`)
                   : t.vehicleId + " · " + info.english}
+                {t.handover && t.status !== "done" && (
+                  <small className="handover-origin">
+                    {" "}
+                    · 第 {t.handover.fromShiftNumber} 班移交，剩{" "}
+                    {Math.round(
+                      Math.max(0, t.duration * (1 - t.progress / 100)),
+                    )}
+                    s
+                  </small>
+                )}
               </div>
               {(t.status === "working" || t.status === "done") && (
                 <div className="task-track">

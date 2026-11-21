@@ -15,6 +15,17 @@ export function delaySeconds(flight: Flight, time: number): number {
     Math.floor((flight.departureAt ?? time) - flight.deadline),
   );
 }
+/**
+ * Delay accrued after this shift took over the aircraft. The delay already
+ * carried into the shift is kept on the record but never re-charged here.
+ */
+export function ownDelaySeconds(flight: Flight, time: number): number {
+  return Math.max(0, delaySeconds(flight, time) - (flight.delayCarried ?? 0));
+}
+/** Points still collectable if pushback happens at `time`. */
+export function departurePoints(flight: Flight, time: number): number {
+  return Math.max(20, 120 - ownDelaySeconds(flight, time));
+}
 export const statusLabels: Record<Flight["status"], string> = {
   scheduled: "计划到达",
   incoming: "等待机位",

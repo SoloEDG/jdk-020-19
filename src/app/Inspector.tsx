@@ -49,6 +49,19 @@ export function Inspector({
           {statusLabels[f.status]}
         </span>
       </div>
+      {(f.delayCarried ?? 0) > 0 && (
+        <div className="delay-ledger" data-testid="delay-ledger">
+          <span>带入延误</span>
+          <b>{Math.floor((f.delayCarried ?? 0) / 60)} 分</b>
+          <span>本班新增</span>
+          <b>
+            {Math.floor(
+              Math.max(0, state.time - f.deadline - (f.delayCarried ?? 0)) / 60,
+            )}{" "}
+            分
+          </b>
+        </div>
+      )}
       <StandPicker state={state} onAssign={onAssign} onSelect={onStand} />
       {f.status !== "incoming" && f.status !== "scheduled" && (
         <div className="stand-occupancy">

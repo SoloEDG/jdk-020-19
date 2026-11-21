@@ -1,4 +1,5 @@
 import type { Shift } from "../../../shared/types";
+import { SHIFT_LENGTH, shiftIdFor } from "../../../shared/constants";
 import { initialFlights } from "../../flights";
 import { initialStands } from "../../apron";
 import { initialServices } from "../../services";
@@ -7,6 +8,10 @@ export function createShift(): Shift {
   const flights = initialFlights();
   return {
     version: 1,
+    shiftId: shiftIdFor(1),
+    number: 1,
+    startedAt: 0,
+    endsAt: SHIFT_LENGTH,
     time: 0,
     paused: false,
     speed: 1,
@@ -21,5 +26,7 @@ export function createShift(): Shift {
     ],
     selectedFlightId: "MU2451",
     nextEventId: 1,
+    archived: false,
+    handoverLog: [],
   };
 }

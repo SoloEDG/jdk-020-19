@@ -8,6 +8,7 @@ export function dispatchService(
   kind: ServiceKind,
   vehicleId: string,
 ): Shift {
+  if (state.archived) return state;
   const s = copyShift(state),
     reason = serviceBlockReason(s, flightId, kind),
     v = s.vehicles.find((x) => x.id === vehicleId),

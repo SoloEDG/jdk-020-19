@@ -14,3 +14,11 @@ export function loadShift(): Shift | undefined {
     return undefined;
   }
 }
+/** Cheap check for the header's load button; avoids re-parsing every tick. */
+export function hasSavedShift(): boolean {
+  try {
+    return !!localStorage.getItem(key);
+  } catch {
+    return false;
+  }
+}

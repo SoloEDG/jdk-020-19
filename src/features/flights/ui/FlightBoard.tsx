@@ -44,6 +44,12 @@ export function FlightBoard({ state, onSelect }: Props) {
               <span>→</span>
               {f.destination.split(" · ")[0]}
             </div>
+            {f.newInbound && <span className="intake-tag">接班进港</span>}
+            {!f.newInbound && (f.delayCarried ?? 0) > 0 && (
+              <span className="carry-tag">
+                带入延误 {Math.floor((f.delayCarried ?? 0) / 60)}′
+              </span>
+            )}
             <div className="flight-meta">
               <span>
                 {f.aircraft} · {f.passengers} PAX

@@ -2,6 +2,7 @@ import type { Shift } from "../../../shared/types";
 import { copyShift, record } from "../../../shared/document";
 import { serviceCatalog } from "./catalog";
 export function advanceServices(state: Shift, seconds: number): Shift {
+  if (state.archived) return state;
   const s = copyShift(state);
   for (const task of s.services) {
     if (task.status !== "working") continue;

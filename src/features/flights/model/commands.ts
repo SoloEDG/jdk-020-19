@@ -1,7 +1,8 @@
 import type { Shift } from "../../../shared/types";
 import { copyShift, record } from "../../../shared/document";
-import { flightReady } from "../lib/readiness";
+import { departurePoints, flightReady } from "../lib/readiness";
 export function assignStand(state: Shift, id: string, standId: string): Shift {
+  if (state.archived) return state;
   const s = copyShift(state),
     f = s.flights.find((x) => x.id === id),
     stand = s.stands.find((x) => x.id === standId);
@@ -20,12 +21,14 @@ export function assignStand(state: Shift, id: string, standId: string): Shift {
     return s;
   }
   f.standId = standId;
+  f.plannedStandId = undefined;
   f.status = "parked";
   s.selectedStandId = standId;
   record(s, `${id} 已停靠 ${standId}，可开始保障`, "success");
   return s;
 }
 export function departFlight(state: Shift, id: string): Shift {
+  if (state.archived) return state;
   const s = copyShift(state),
     f = s.flights.find((x) => x.id === id);
   if (!f) return state;
@@ -35,16 +38,18 @@ export function departFlight(state: Shift, id: string): Shift {
   }
   f.status = "departing";
   f.departureAt = s.time;
-  const delay = Math.max(0, s.time - f.deadline);
-  const points = Math.max(20, 120 - Math.floor(delay));
+  f.departureShiftId = s.shiftId;
+  f.departureShiftNumber = s.number;
+  const points = departurePoints(f, s.time);
   s.score += points;
   record(s, `${id} 获准推出 · +${points} 分`, "success");
   return s;
 }
 export function selectFlight(state: Shift, id: string): Shift {
+  const f = state.flights.find((x) => x.id === id);
   return {
     ...state,
     selectedFlightId: id,
-    selectedStandId: state.flights.find((f) => f.id === id)?.standId,
+    selectedStandId: f?.standId ?? f?.plannedStandId,
   };
 }
